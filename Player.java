@@ -7,6 +7,19 @@ import java.math.*;
  * the standard input according to the problem statement.
  **/
 class Player {
+    
+    private static boolean isFactory(String entityType) {
+        return entityType.equals("FACTORY");
+    }
+    
+    private static void updateFactoryInfo(int entityId, int arg1, int arg2, int arg3, int arg4, int arg5, int[][] info) {
+        info[entityId][0] = arg1;
+        info[entityId][1] = arg2;
+        info[entityId][2] = arg3;
+        info[entityId][3] = arg4;
+        info[entityId][4] = arg5;
+    }
+    
     public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
         int nFactories = in.nextInt(); // the number of factories
@@ -22,6 +35,7 @@ class Player {
 
         // game loop
         while (true) {
+            int[][] factoryInfo = new int[nFactories][5];
             int entityCount = in.nextInt(); // the number of entities (e.g. factories and troops)
             for (int i = 0; i < entityCount; i++) {
                 int entityId = in.nextInt();
@@ -32,6 +46,9 @@ class Player {
                 int arg4 = in.nextInt();
                 int arg5 = in.nextInt();
                 
+                if (isFactory(entityType)) {
+                    updateFactoryInfo(entityId, arg1, arg2, arg3, arg4, arg5, factoryInfo);
+                }
             }
 
             // Write an action using System.out.println()
