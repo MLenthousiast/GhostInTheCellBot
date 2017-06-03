@@ -13,12 +13,19 @@ class Player {
     private static int nFactories;
     private static int nLinks;
     
+    private static int[][] factoryInfo;
+    private static int[][] link;
+    
     private static boolean isFactory(final String entityType) {
         return entityType.equals("FACTORY");
     }
     
-    private static boolean isFriendly(final int factory, final int[][] info) {
-        return info[factory][0] == 1;
+    private static boolean isFriendly(int factory) {
+        return factoryInfo[factory][0] == 1;
+    }
+    
+    private static boolean isTarget(int factory) {
+        return !isFriendly(factory);
     }
     
     private static void updateFactoryInfo(int entityId, int arg1, int arg2, int arg3, int arg4, int arg5, int[][] info) {
@@ -29,31 +36,72 @@ class Player {
         info[entityId][4] = arg5;
     }
     
-    private static int getAvailableTroops(final int factory, final int[][] info) {
-        return info[factory][1];
+    private static int getClosest(int from, int destA, int destB) {
+        if (link[from][destA] <= link[from][destB]) {
+            return destA;
+        }
+        // else
+        return destB;
     }
     
-    private static String attackCommand(final int factory, final int target, final int nTroops) {
-        return ";MOVE " + factory + " " + target + " " + nTroops;
+    private static Set<Integer> getTargets() {
+        Set<Integer> targets = new HashSet();
+        for (int factory = 0; factory < nFactories; ++factory) {
+            if (isTarget(factory)) {
+                targets.add(factory);
+            }
+        }
+        return targets;
     }
     
-    private static String randomAttackCommand(final int factory, final int[][] info) {
+    private static int getAvailableTroops(int factory) {
+        return factoryInfo[factory][1];
+    }
+    
+    private static String attackCommand(int from, int target, int nTroops) {
+        return ";MOVE " + from + " " + target + " " + nTroops;
+    }
+    
+    private static String randomAttackCommand(int from) {
         // get random number of troops to send, or 0 if none available
-        final int nTroopsAvailable = getAvailableTroops(factory, info);
+        int nTroopsAvailable = getAvailableTroops(from);
         int nTroops = 0;
         if (nTroopsAvailable > 0) nTroops = r.nextInt(nTroopsAvailable);
         // get random target
         int target = r.nextInt(nFactories);
-        while (target == factory) target = r.nextInt(nFactories);
+        while (target == from) target = r.nextInt(nFactories);
         // create command
-        return attackCommand(factory, target, nTroops);
+        return attackCommand(from, target, nTroops);
     }
+    
+    private static String closestTargetAttackCommand(int from, int nTroops) {
+        Set<Integer> targets = getTargets();
+        
+        // find closest target
+        int target = from;
+        for (int availableTarget: targets) {
+            if (target == from) {
+                target = availableTarget;
+            }
+            else {
+                target = getClosest(from, target, availableTarget);
+            }
+        }
+        if (target == from) {
+            // no targets available, move random
+            return randomAttackCommand(from);
+        }
+        // else
+        // attack closest target
+        return attackCommand(from, target, nTroops);
+    }
+    
     
     public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
         nFactories = in.nextInt(); // the number of factories
         nLinks = in.nextInt(); // the number of links between factories
-        int[][] link = new int[nFactories][nFactories];
+        link = new int[nFactories][nFactories];
         for (int i = 0; i < nLinks; i++) {
             int factory1 = in.nextInt();
             int factory2 = in.nextInt();
@@ -66,7 +114,7 @@ class Player {
         while (true) {
             String command = "WAIT";
             
-            int[][] factoryInfo = new int[nFactories][5];
+            factoryInfo = new int[nFactories][5];
             int entityCount = in.nextInt(); // the number of entities (e.g. factories and troops)
             for (int i = 0; i < entityCount; i++) {
                 int entityId = in.nextInt();
@@ -88,8 +136,8 @@ class Player {
 
             // Let all friendly factories fire at random
             for (int factory = 0; factory < nFactories; ++factory) {
-                if (isFriendly(factory, factoryInfo)) {
-                    command += randomAttackCommand(factory, factoryInfo);
+                if (isFriendly(factory)) {
+                    command += closestTargetAttackCommand(factory, 99);
                 }
             }
             System.out.println(command);
