@@ -8,8 +8,17 @@ import java.math.*;
  **/
 class Player {
     
-    private static boolean isFactory(String entityType) {
+    private static Random r = new Random();
+    
+    private static int nFactories;
+    private static int nLinks;
+    
+    private static boolean isFactory(final String entityType) {
         return entityType.equals("FACTORY");
+    }
+    
+    private static boolean isFriendly(final int factory, final int[][] info) {
+        return info[factory][0] == 1;
     }
     
     private static void updateFactoryInfo(int entityId, int arg1, int arg2, int arg3, int arg4, int arg5, int[][] info) {
@@ -20,10 +29,30 @@ class Player {
         info[entityId][4] = arg5;
     }
     
+    private static int getAvailableTroops(final int factory, final int[][] info) {
+        return info[factory][1];
+    }
+    
+    private static String attackCommand(final int factory, final int target, final int nTroops) {
+        return ";MOVE " + factory + " " + target + " " + nTroops;
+    }
+    
+    private static String randomAttackCommand(final int factory, final int[][] info) {
+        // get random number of troops to send, or 0 if none available
+        final int nTroopsAvailable = getAvailableTroops(factory, info);
+        int nTroops = 0;
+        if (nTroopsAvailable > 0) nTroops = r.nextInt(nTroopsAvailable);
+        // get random target
+        int target = r.nextInt(nFactories);
+        while (target == factory) target = r.nextInt(nFactories);
+        // create command
+        return attackCommand(factory, target, nTroops);
+    }
+    
     public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
-        int nFactories = in.nextInt(); // the number of factories
-        int nLinks = in.nextInt(); // the number of links between factories
+        nFactories = in.nextInt(); // the number of factories
+        nLinks = in.nextInt(); // the number of links between factories
         int[][] link = new int[nFactories][nFactories];
         for (int i = 0; i < nLinks; i++) {
             int factory1 = in.nextInt();
@@ -35,6 +64,8 @@ class Player {
 
         // game loop
         while (true) {
+            String command = "WAIT";
+            
             int[][] factoryInfo = new int[nFactories][5];
             int entityCount = in.nextInt(); // the number of entities (e.g. factories and troops)
             for (int i = 0; i < entityCount; i++) {
@@ -55,8 +86,13 @@ class Player {
             // To debug: System.err.println("Debug messages...");
 
 
-            // Any valid action, such as "WAIT" or "MOVE source destination cyborgs"
-            System.out.println("WAIT");
+            // Let all friendly factories fire at random
+            for (int factory = 0; factory < nFactories; ++factory) {
+                if (isFriendly(factory, factoryInfo)) {
+                    command += randomAttackCommand(factory, factoryInfo);
+                }
+            }
+            System.out.println(command);
         }
     }
 }
