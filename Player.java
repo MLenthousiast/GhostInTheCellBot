@@ -3,8 +3,10 @@ import java.io.*;
 import java.math.*;
 
 /**
- * Auto-generated code below aims at helping you parse
- * the standard input according to the problem statement.
+ * Bot summary:
+ * Each friendly factory attacks the closest non-friendly factory with all available troops.
+ * If no non-friendly factories are available a random move is made.
+ * A bomb is send to a enemy factory with the most number of units. This is done from the closest friendly factory.
  **/
 class Player {
     
@@ -16,17 +18,35 @@ class Player {
     private static int[][] factoryInfo;
     private static int[][] link;
     
+    private static int availableBombs = 2;
+    
+    
+    
     private static boolean isFactory(final String entityType) {
         return entityType.equals("FACTORY");
     }
+    
     
     private static boolean isFriendly(int factory) {
         return factoryInfo[factory][0] == 1;
     }
     
+    
+    private static boolean isEnemy(int factory) {
+        return factoryInfo[factory][0] == -1;
+    }
+    
+    
     private static boolean isTarget(int factory) {
         return !isFriendly(factory);
     }
+    
+    
+    private static boolean isUpgradable(int factory) {
+        // check if enough troops and not already at max production
+        return factoryInfo[factory][1] >= 10 && factoryInfo[factory][2] < 3;
+    }
+    
     
     private static void updateFactoryInfo(int entityId, int arg1, int arg2, int arg3, int arg4, int arg5, int[][] info) {
         info[entityId][0] = arg1;
@@ -36,6 +56,12 @@ class Player {
         info[entityId][4] = arg5;
     }
     
+    
+    private static int getProduction(int factory) {
+        return factoryInfo[factory][1];
+    }
+    
+    
     private static int getClosest(int from, int destA, int destB) {
         if (link[from][destA] <= link[from][destB]) {
             return destA;
@@ -44,23 +70,68 @@ class Player {
         return destB;
     }
     
-    private static Set<Integer> getTargets() {
+    
+    private static Set<Integer> getTargets(int minTargetProduction) {
         Set<Integer> targets = new HashSet();
         for (int factory = 0; factory < nFactories; ++factory) {
-            if (isTarget(factory)) {
+            if (isTarget(factory) && getProduction(factory) > minTargetProduction) {
                 targets.add(factory);
             }
         }
         return targets;
     }
     
+    
+    private static Set<Integer> getEnemies() {
+        Set<Integer> enemies = new HashSet();
+        for (int factory = 0; factory < nFactories; ++factory) {
+            if (isEnemy(factory)) {
+                enemies.add(factory);
+            }
+        }
+        return enemies;
+    }
+    
+    
+    private static int getHighestProducingEnemy() {
+        Set<Integer> enemies = getEnemies();
+        int highestProducing = -1;
+        for (int enemy: enemies) {
+            if (highestProducing == -1 || getProduction(enemy) > getProduction(highestProducing)) {
+                highestProducing = enemy;
+            }
+        }
+        if (highestProducing == -1) {
+            return 0; // TODO fixme
+        }
+        return highestProducing;
+    }
+    
+    
+    private static int getClosestFriend(int target) {
+        int closestFriend = -1;
+        for (int factory = 0; factory < nFactories; ++factory) {
+            if (isFriendly(factory)) {
+                if (closestFriend == -1) {
+                    closestFriend = factory;
+                }
+                else {
+                    closestFriend = getClosest(target, closestFriend, factory);
+                }
+            }
+        }
+        return closestFriend;
+    }
+    
     private static int getAvailableTroops(int factory) {
         return factoryInfo[factory][1];
     }
     
+    
     private static String attackCommand(int from, int target, int nTroops) {
         return ";MOVE " + from + " " + target + " " + nTroops;
     }
+    
     
     private static String randomAttackCommand(int from) {
         // get random number of troops to send, or 0 if none available
@@ -74,8 +145,9 @@ class Player {
         return attackCommand(from, target, nTroops);
     }
     
-    private static String closestTargetAttackCommand(int from, int nTroops) {
-        Set<Integer> targets = getTargets();
+    
+    private static String closestTargetAttackCommand(int from, int nTroops, int minTargetProduction) {
+        Set<Integer> targets = getTargets(minTargetProduction);
         
         // find closest target
         int target = from;
@@ -97,6 +169,28 @@ class Player {
     }
     
     
+    private static String bombCommand(int from, int target) {
+        if (availableBombs > 0) {
+            --availableBombs;
+            return ";BOMB " + from + " " + target;
+        }
+        // else
+        return "";
+    }
+    
+    
+    private static String bombHighestProducingEnemy() {
+        int enemy = getHighestProducingEnemy();
+        int from = getClosestFriend(enemy);
+        return bombCommand(from, enemy);
+    }
+    
+    
+    private static String upgradeCommand(int factory) {
+        return ";INC " + factory;
+    }
+    
+    
     public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
         nFactories = in.nextInt(); // the number of factories
@@ -109,6 +203,9 @@ class Player {
             link[factory1][factory2] = distance;
             link[factory2][factory1] = distance;
         }
+
+        boolean isFirstTurn = true;
+        int stepsSinceLastBomb = 6;
 
         // game loop
         while (true) {
@@ -134,13 +231,20 @@ class Player {
             // To debug: System.err.println("Debug messages...");
 
 
-            // Let all friendly factories fire at random
             for (int factory = 0; factory < nFactories; ++factory) {
                 if (isFriendly(factory)) {
-                    command += closestTargetAttackCommand(factory, 99);
+                    command += closestTargetAttackCommand(factory, Math.max(factoryInfo[factory][1] - 3,0), 1);
                 }
             }
+            // overwrite action of the closest factory to the highest producing enemy with bombing
+            if (stepsSinceLastBomb > 5) {
+                command += bombHighestProducingEnemy();
+                stepsSinceLastBomb = 0;
+            }
             System.out.println(command);
+            
+            isFirstTurn = false;
+            ++stepsSinceLastBomb;
         }
     }
 }
